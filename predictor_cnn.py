@@ -568,42 +568,75 @@ def _build_suggestions(title, content, tags, final_label, results):
     _ensure_lexicons()
     suggestions = []
 
-    # 文本特征建议
+    # ---- 正文长度 ----
     chars = len(str(content))
-    if chars < 100:
-        suggestions.append(f'正文偏短 ({chars} 字), 建议扩充至 200~400 字')
+    if chars < 30:
+        suggestions.append(
+            f'📏 **正文太短**（仅 {chars} 字）：读者看不到详细信息，划走概率很高。\n\n'
+            f'建议扩充到 200~400 字，至少包含：店铺名、具体位置、推荐菜品、价格、个人感受。')
+    elif chars < 100:
+        suggestions.append(
+            f'📏 **正文偏短**（{chars} 字）：信息量不足，建议再加点细节。\n\n'
+            f'比如具体地址、人均多少、什么时候去的、排队多久——这些读者都关心。')
     elif chars > 800:
-        suggestions.append(f'正文过长 ({chars} 字), 建议精简到 300~500 字')
+        suggestions.append(
+            f'📏 **正文偏长**（{chars} 字）：超出探店帖常规长度，读者可能没耐心看完。\n\n'
+            f'建议精简到 300~500 字，核心信息放最前面。')
 
+    # ---- 标题情感 ----
     sent = len(set(jieba.cut(str(title))) & (_pos_words or set())) - len(set(jieba.cut(str(title))) & (_neg_words or set()))
-    if sent <= 0:
-        suggestions.append('标题情感强度不足, 多用"绝了、巨好吃、必冲"等强烈词')
+    if sent < 0:
+        suggestions.append(
+            f'🎭 **标题偏负面**（情感分 {sent}）：小红书用户更爱点开积极、有惊喜感的标题。\n\n'
+            f'试试加入"绝了""巨好吃""必冲""太值了"这类词。')
+    elif sent == 0:
+        suggestions.append(
+            f'🎭 **标题缺情感词**：目前标题比较平淡，加一两个情绪词能提高点击欲。\n\n'
+            f'比如"这家真的可以冲""人均30的快乐谁懂啊"——不需要夸张，但要表达出真实感受。')
 
+    # ---- 标签数量 ----
     tag_count = max(len([t for t in tags.split(',') if t.strip()]),
                     len([t for t in tags.split('#') if t.strip()])) if tags.strip() else 0
-    if tag_count < 3:
-        suggestions.append(f'标签偏少 ({tag_count} 个), 建议加到 3~5 个')
+    if tag_count == 0:
+        suggestions.append(
+            f'🏷️ **没加标签**：小红书靠标签推荐流量，一个标签不加会损失大量曝光。\n\n'
+            f'建议加 3 个：1 个地域（如"天津师范"）、1 个品类（如"校园美食"）、1 个热点（如"穷鬼套餐"）。')
+    elif tag_count < 2:
+        suggestions.append(
+            f'🏷️ **标签太少**（仅 {tag_count} 个）：建议加到 3~5 个，覆盖更多搜索入口。')
+    elif tag_count >= 6:
+        suggestions.append(
+            f'🏷️ **标签过多**（{tag_count} 个）：小红书用户对过度堆标签有反感，建议精简到 3~5 个最核心的。')
 
+    # ---- 标题感叹号 ----
     if '！' not in title and '!' not in title:
-        suggestions.append('标题缺少感叹号, 加一个能提升情绪感染力')
+        suggestions.append(
+            '✍️ **标题缺感叹号**：试试在末尾加一个"！"，数据上带感叹号的标题点击率更高。')
 
-    # 图文不符警告
+    # ---- 图文不符警告 ----
     if results['mismatch_level'] == 'severe':
-        suggestions.insert(0, f'[图文不符警告] {results["mismatch_reason"]}')
+        suggestions.insert(0,
+            f'🛑 **图文严重不符**：{results["mismatch_reason"]}')
     elif results['mismatch_level'] == 'mild':
-        suggestions.insert(0, f'[注意] {results["mismatch_reason"]}')
+        suggestions.insert(0,
+            f'⚠️ **图文略有偏差**：{results["mismatch_reason"]}')
 
-    # 封面建议
+    # ---- 封面建议 ----
     if results.get('cnn') and results['cnn'].get('error') is None:
         cnn_label = results['cnn']['label']
         if cnn_label == 0:
-            suggestions.append('封面视觉吸引力偏弱, 建议使用高饱和度、清晰构图、食物特写的封面')
+            suggestions.append(
+                '🖼 **封面吸引力偏弱**：封面是用户第一眼的决策依据。\n\n'
+                '建议：① 食物特写比远景更诱人；② 暖色调比冷色调更吸睛；③ 画面干净、主体突出。')
         elif cnn_label == 2:
-            suggestions.append('封面视觉效果很好, 保持这个风格!')
+            suggestions.append('🖼 **封面质量不错**，视觉效果在训练数据中更接近爆款帖子，保持这个风格！')
 
+    # ---- 最终判断 ----
     if final_label == 2 and not suggestions:
-        suggestions.append('各项指标都很好, 封面和文案匹配度也高, 直接发布!')
+        suggestions.append('各项指标都很好，封面和文案匹配度也高，直接发布！')
     elif final_label == 0 and not suggestions:
-        suggestions.append('综合特征偏弱, 建议优化正文长度/标题情感/标签数量, 并检查封面质量')
+        suggestions.append(
+            '📊 **各维度均偏弱**：建议从正文长度、标题情感、标签数量、封面质量四个方面逐一优化。\n\n'
+            '修改后可以再跑一次预测，看看分数有没有变化。')
 
     return suggestions

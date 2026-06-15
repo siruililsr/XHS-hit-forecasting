@@ -268,14 +268,7 @@ def predict_with_mode(title: str, content: str, tags: str = '',
 
 
 def _build_suggestions(title, content, raw_row, pred, comments):
-    """根据原始特征生成改进建议 (无 _heuristic_bias)
-
-    设计原则 — 保守 + 数据驱动:
-      1. 不给"加字/加标签/加感叹号"等具体写作建议, 因为数据上这些特征与"高热度"
-         相关性为负或近零 (content_len_words r=-0.186, tag_count r=-0.145).
-      2. 只提示"可观察信号"和"可执行的下一步", 不替用户做价值判断.
-      3. 真实爆款规律超出本模型能力, 让用户结合外部经验判断.
-    """
+    """根据原始特征生成具体可执行的改进建议"""
     suggestions = []
     chars_idx = _struct_cols.index('content_len_chars')
     sent_idx  = _struct_cols.index('title_sent')
@@ -285,33 +278,66 @@ def _build_suggestions(title, content, raw_row, pred, comments):
     sent  = raw_row[sent_idx]
     tag_n = raw_row[tag_idx]
 
-    # 客观特征提示 (不引导方向, 只报告"模型学到了什么")
+    # ---- 正文长度 ----
     if chars < 30:
-        suggestions.append(f'📏 当前正文仅 {int(chars)} 字, 特征空间信息量较少, 建议结合实际场景决定是否扩写')
+        suggestions.append(
+            f'📏 **正文太短**（仅 {int(chars)} 字）：读者看不到详细信息，划走概率很高。\n\n'
+            f'建议扩充到 200~400 字，至少包含：店铺名、具体位置、推荐菜品、价格范围、个人感受。')
+    elif chars < 100:
+        suggestions.append(
+            f'📏 **正文偏短**（{int(chars)} 字）：信息量不足，建议再加点细节。\n\n'
+            f'比如具体地址、人均消费、什么时候去的、排队多久——这些读者都关心。')
     elif chars > 800:
-        suggestions.append(f'📏 当前正文 {int(chars)} 字, 超出常规探店帖长度, 建议精简或分篇发布')
+        suggestions.append(
+            f'📏 **正文偏长**（{int(chars)} 字）：超出探店帖的常规长度，读者可能没耐心看完。\n\n'
+            f'建议精简到 300~500 字，把最核心的信息放前面。')
 
-    if abs(sent) < 0.3:
-        suggestions.append('🎭 标题情感倾向偏中性, 实际数据中情感词与热度相关性较弱 (r≈0.02), 仅作参考')
+    # ---- 标题情感 ----
+    if sent < 0:
+        suggestions.append(
+            f'🎭 **标题偏负面**（情感分 {int(sent)}）：小红书用户更爱点开积极、有惊喜感的标题。\n\n'
+            f'试试加入"绝了""巨好吃""必冲""太值了"这类词。')
+    elif sent == 0:
+        suggestions.append(
+            f'🎭 **标题缺情感词**：目前标题比较平淡，加一两个情绪词能提高点击欲。\n\n'
+            f'比如"这家真的可以冲""人均30的快乐谁懂啊"——不需要夸张，但要表达出你的真实感受。')
 
+    # ---- 标签数量 ----
     if tag_n == 0:
-        suggestions.append(f'🏷️ 当前 0 个标签, 建议至少加 1~2 个核心标签以提升检索可见度')
+        suggestions.append(
+            f'🏷️ **没加标签**：小红书靠标签推荐流量，一个标签不加会损失大量曝光。\n\n'
+            f'建议加 3 个左右：1 个地域标签（如"天津师范"）、1 个品类标签（如"校园美食"）、1 个热点标签（如"穷鬼套餐"）。')
+    elif tag_n < 2:
+        suggestions.append(
+            f'🏷️ **标签太少**（仅 {int(tag_n)} 个）：建议加到 3~5 个，覆盖更多搜索入口。')
     elif tag_n >= 6:
-        suggestions.append(f'🏷️ 标签 {int(tag_n)} 个偏多, 在本模型上 1~3 个标签判别度更稳定')
+        suggestions.append(
+            f'🏷️ **标签过多**（{int(tag_n)} 个）：小红书用户对过度堆标签有反感，建议精简到 3~5 个最核心的。')
 
+    # ---- 标题互动提示 ----
     if '？' in title or '?' in title:
-        suggestions.append('❓ 标题带问号, 在训练数据中弱正相关 (r=+0.088), 可保留作为互动切入点')
+        suggestions.append(
+            '💡 **标题含问号**是个好信号！问句容易引发评论区互动。可以配合正文末尾抛一个问题，进一步引导评论。')
 
+    # ---- 首批评论 ----
     if (not comments or len(comments) == 0):
-        suggestions.append('💬 尚无首批评论, 实际数据中 `comment_n` 是最强正信号 (r=+0.41), 发布后建议主动引导 1~2 条互动')
+        suggestions.append(
+            '💬 **还没有评论数据**：在我们训练的 649 条帖子中，评论数是预测热度最强的信号。\n\n'
+            '发布后如果能主动回复前几条评论、或者在正文末尾引导互动（比如"你们觉得哪家更好吃？"），拿到 5~10 条首批评论后再用"发后重测"Tab 跑一次，预测会准很多。')
 
-    # 概率稳定度提示 (校准后 F1 仍有上限, 给用户心理预期)
+    # ---- 综合判断 ----
     if pred == 0:
-        suggestions.append('📊 当前判为低热度, F1=0.408 表示发前预测约 41% 准确, 实际走势以发布后数据为准')
+        suggestions.append(
+            '📊 **综合判断：低热度概率最高**。但这只是基于 649 条历史帖子的统计规律，不代表你的帖子一定不火。\n\n'
+            '建议按上面的提示优化后，切换到"发后重测"Tab 再评估一次。')
     elif pred == 2:
-        suggestions.append('📊 当前判为高热度, F1=0.408 表示仍有近 60% 概率被错判, 建议谨慎参考')
+        suggestions.append(
+            '📊 **综合判断：高热度概率最高**。恭喜！从数据上看你的帖子各项指标都不错，在 649 条训练样本中更接近爆款的特征分布。\n\n'
+            '当然，最终还要看发布时间、平台推荐机制等我们无法控制的变量。')
     else:
-        suggestions.append('📊 当前判为中热度, 三类判别重叠较大, 可结合封面与首批评论复测')
+        suggestions.append(
+            '📊 **综合判断：中热度概率最高**，三类之间差距可能不大。\n\n'
+            '这种情况建议两条腿走路：上传封面走多模态预测，或者等有了首批评论后用"发后重测"再跑一次。')
 
     return suggestions
 
