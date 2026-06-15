@@ -1,0 +1,8 @@
+{
+  "threshold": 36.55180549621582,
+  "threshold_strict": 34.66924781799317,
+  "mean": 43.660922136238156,
+  "std": 4.32346634620025,
+  "n_samples": 556,
+  "model": "OFA-Sys/chinese-clip-vit-base-patch16"
+}

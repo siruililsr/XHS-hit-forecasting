@@ -1,0 +1,12 @@
+streamlit>=1.28
+scikit-learn>=1.5
+jieba
+numpy>=1.26,<2.0
+pandas
+joblib>=1.3
+scipy
+Pillow
+torch>=2.0
+torchvision>=0.15
+transformers>=4.35
+huggingface_hub
