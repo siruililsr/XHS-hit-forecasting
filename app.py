@@ -232,9 +232,20 @@ def _render_result(result, mode: str, f1: float, cmt_n: int = 0):
     cols_prob[1].metric('中热度', f'{p[1]*100:.1f}%', delta='最可能' if label == 1 else None, delta_color='off')
     cols_prob[2].metric('高热度', f'{p[2]*100:.1f}%', delta='最可能' if label == 2 else None, delta_color='normal')
 
-    bar_colors = ['#ff4b4b', '#ffa500', '#21c354']  # 低→中→高: 红→橙→绿
-    prob_df = pd.DataFrame({'低热度': [p[0]], '中热度': [p[1]], '高热度': [p[2]]})
-    st.bar_chart(prob_df, height=200, color=bar_colors)
+    # 三色进度条: 低=红, 中=橙, 高=绿
+    cols_bar = st.columns(3)
+    with cols_bar[0]:
+        st.caption('🔴 低热度')
+        st.progress(float(p[0]))
+        st.caption(f'{p[0]*100:.1f}%')
+    with cols_bar[1]:
+        st.caption('🟠 中热度')
+        st.progress(float(p[1]))
+        st.caption(f'{p[1]*100:.1f}%')
+    with cols_bar[2]:
+        st.caption('🟢 高热度')
+        st.progress(float(p[2]))
+        st.caption(f'{p[2]*100:.1f}%')
 
     # 大字标签
     st.markdown(
@@ -470,8 +481,19 @@ with tab_pre:
             cols_prob[0].metric('低热度', f'{p[0]*100:.1f}%', delta='最可能' if final == 0 else None, delta_color='inverse')
             cols_prob[1].metric('中热度', f'{p[1]*100:.1f}%', delta='最可能' if final == 1 else None, delta_color='off')
             cols_prob[2].metric('高热度', f'{p[2]*100:.1f}%', delta='最可能' if final == 2 else None, delta_color='normal')
-            prob_df = pd.DataFrame({'低热度': [p[0]], '中热度': [p[1]], '高热度': [p[2]]})
-            st.bar_chart(prob_df, height=200, color=['#ff4b4b', '#ffa500', '#21c354'])
+            cols_bar = st.columns(3)
+            with cols_bar[0]:
+                st.caption('🔴 低热度')
+                st.progress(float(p[0]))
+                st.caption(f'{p[0]*100:.1f}%')
+            with cols_bar[1]:
+                st.caption('🟠 中热度')
+                st.progress(float(p[1]))
+                st.caption(f'{p[1]*100:.1f}%')
+            with cols_bar[2]:
+                st.caption('🟢 高热度')
+                st.progress(float(p[2]))
+                st.caption(f'{p[2]*100:.1f}%')
             st.markdown(
                 f"<h1 style='text-align:center; color:{color};'>预测: {label_names[final]}</h1>",
                 unsafe_allow_html=True
@@ -598,8 +620,19 @@ with tab_post:
             cols_prob[0].metric('低热度', f'{p[0]*100:.1f}%', delta='最可能' if final == 0 else None, delta_color='inverse')
             cols_prob[1].metric('中热度', f'{p[1]*100:.1f}%', delta='最可能' if final == 1 else None, delta_color='off')
             cols_prob[2].metric('高热度', f'{p[2]*100:.1f}%', delta='最可能' if final == 2 else None, delta_color='normal')
-            prob_df = pd.DataFrame({'低热度': [p[0]], '中热度': [p[1]], '高热度': [p[2]]})
-            st.bar_chart(prob_df, height=200, color=['#ff4b4b', '#ffa500', '#21c354'])
+            cols_bar = st.columns(3)
+            with cols_bar[0]:
+                st.caption('🔴 低热度')
+                st.progress(float(p[0]))
+                st.caption(f'{p[0]*100:.1f}%')
+            with cols_bar[1]:
+                st.caption('🟠 中热度')
+                st.progress(float(p[1]))
+                st.caption(f'{p[1]*100:.1f}%')
+            with cols_bar[2]:
+                st.caption('🟢 高热度')
+                st.progress(float(p[2]))
+                st.caption(f'{p[2]*100:.1f}%')
             st.markdown(
                 f"<h1 style='text-align:center; color:{color};'>预测: {label_names[final]}</h1>",
                 unsafe_allow_html=True
